@@ -77,6 +77,9 @@ convergence, the weighting-potential sum rule, exponential decay of pad
 ripple, one elementary charge induced per collected electron, and the
 finite-supercell induced-charge deficit.
 
+## Note
+If proven successful, this method will be implemented in the package `pochoir` for pixelated readout LArTPC.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
