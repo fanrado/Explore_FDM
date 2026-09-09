@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+
+# generated run outputs
+out/
+out_clean/
+*.npz
+*.png
+*.csv
+stages.jsonl
