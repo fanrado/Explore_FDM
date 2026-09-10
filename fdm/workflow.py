@@ -35,14 +35,21 @@ from .tree import Octree
 
 # --------------------------------------------------------------------- config
 
+# Pad width as a fraction of the pitch, when not set explicitly.  11/16 keeps
+# both the pad and the gap on the h_min lattice for any lmax >= 4, and
+# reproduces the 3.048 mm pad / 1.386 mm gap of the reference 4.434 mm pitch.
+PAD_FRACTION = 11.0 / 16.0
+
+
 @dataclass
 class Config:
     outdir: str = "out"
     # geometry
     pitch: float = 4.434          # mm, pad pitch
+    pad_width: float | None = None  # mm, conducting pad; None -> PAD_FRACTION
     lmax: int = 5                 # h_min = pitch / 2**lmax
     npad: int = 5                 # NxN periodic supercell
-    nz: int = 12                  # drift length, in pitches
+    drift_length: float = 53.208  # mm, anode plane to cathode
     efield: float = 500.0         # V/cm
     grade: float = 8.0            # cell size ~ dist_to_anode / grade
     # solver
@@ -71,8 +78,39 @@ class Config:
         return self.pitch / (1 << self.lmax)
 
     @property
-    def drift_length(self) -> float:
-        return self.nz * self.pitch
+    def pad_mm(self) -> float:
+        """Conducting pad width (mm).
+
+        Defaults to ``PAD_FRACTION`` of the pitch, which for the reference
+        4.434 mm pitch gives the 3.048 mm pad / 1.386 mm gap this study uses.
+        Must be an integer multiple of ``h_min`` so every pad edge lands exactly
+        on a grid line; ``PixelAnode`` raises if it does not.
+        """
+        if self.pad_width is not None:
+            return float(self.pad_width)
+        return PAD_FRACTION * self.pitch
+
+    @property
+    def gap_mm(self) -> float:
+        """Inter-pad gap width (mm) -- the length scale that sets h_min."""
+        return self.pitch - self.pad_mm
+
+    @property
+    def nz(self) -> int:
+        """Drift length in pitches: the tree's root-cell count along z.
+
+        Derived from ``drift_length`` rather than configured, so the config
+        states the physical length and the mesh follows.  The drift must be an
+        integer number of pitches; violations raise rather than snapping, for
+        the same reason pad edges must land on the lattice.
+        """
+        n = self.drift_length / self.pitch
+        if abs(n - round(n)) > 1e-9:
+            raise ValueError(
+                f"drift_length = {self.drift_length} mm is not an integer "
+                f"multiple of pitch = {self.pitch} mm "
+                f"(would be {n:.6f} pitches)")
+        return int(round(n))
 
     @property
     def e0(self) -> float:
@@ -168,7 +206,7 @@ def stage_grid(cfg: Config, ctx: Context):
     """Build the octree, the composite operator and the electrode masks."""
     tree = Octree((cfg.npad, cfg.npad, cfg.nz), lmax=cfg.lmax, h_min=cfg.h_min,
                   periodic=(True, True, False))
-    pad = PixelAnode(tree, pitch=cfg.pitch, pad=(11 << (cfg.lmax - 4)) * cfg.h_min)
+    pad = PixelAnode(tree, pitch=cfg.pitch, pad=cfg.pad_mm)
     tree.build(pad.refine_predicate(grade=cfg.grade))
 
     coords, _ = tree.nodes()

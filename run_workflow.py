@@ -64,7 +64,10 @@ def main():
     values = {}
     if args.config:
         with open(args.config) as f:
-            values.update(json.load(f))
+            loaded = json.load(f)
+        # JSON has no comments, so keys beginning with "_" are treated as prose
+        # and ignored.  That lets a config file document itself.
+        values.update({k: v for k, v in loaded.items() if not k.startswith("_")})
     for f in dataclasses.fields(Config):
         v = getattr(args, f.name, None)
         if v is not None:
@@ -88,6 +91,8 @@ def main():
     print(f"outdir  {cfg.outdir}")
     print(f"grid    {cfg.npad}x{cfg.npad} pads, pitch {cfg.pitch} mm, "
           f"h_min {cfg.h_min*1000:.1f} um, drift {cfg.drift_length:.1f} mm")
+    print(f"anode   pad {cfg.pad_mm:.4f} mm ({cfg.pad_mm/cfg.h_min:.0f} h_min), "
+          f"gap {cfg.gap_mm:.4f} mm ({cfg.gap_mm/cfg.h_min:.0f} h_min)")
     print(f"field   {cfg.efield} V/cm    device {cfg.device} {cfg.dtype}")
     print(f"stages  {' -> '.join(stages)}\n")
     run(cfg, stages=stages)

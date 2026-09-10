@@ -26,6 +26,7 @@ from fdm.drift import (E_CHARGE, Interpolator, drift_paths, drift_velocity,
                        fill_missing, induced_current)
 from fdm.field import Gradient
 from fdm.geometry import PixelAnode
+from fdm.workflow import PAD_FRACTION
 from fdm.io import sample_grid, save_currents, save_field, save_grid
 from fdm.operator import Operator
 from fdm.solve import solve
@@ -38,9 +39,12 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--outdir", default="out")
     ap.add_argument("--pitch", type=float, default=4.434, help="pad pitch, mm")
+    ap.add_argument("--pad-width", type=float, default=None,
+                    help="conducting pad width, mm (default 11/16 of pitch)")
     ap.add_argument("--lmax", type=int, default=5, help="h_min = pitch/2**lmax")
     ap.add_argument("--npad", type=int, default=5, help="NxN periodic supercell")
-    ap.add_argument("--nz", type=int, default=12, help="drift length in pitches")
+    ap.add_argument("--drift-length", type=float, default=53.208,
+                    help="drift length, mm (must be a whole number of pitches)")
     ap.add_argument("--efield", type=float, default=500.0, help="drift field, V/cm")
     ap.add_argument("--ngrid", type=int, default=10, help="NxN drift start points")
     ap.add_argument("--slab", type=float, default=3.0,
@@ -56,15 +60,21 @@ def main():
 
     os.makedirs(a.outdir, exist_ok=True)
     hmin = a.pitch / (1 << a.lmax)
-    LD = a.nz * a.pitch
+    LD = a.drift_length
+    nzp = LD / a.pitch
+    if abs(nzp - round(nzp)) > 1e-9:
+        raise SystemExit(f"drift length {LD} mm is not a whole number of "
+                         f"pitches ({nzp:.6f})")
+    nzp = int(round(nzp))
     E0 = a.efield / 10.0                      # V/cm -> V/mm
     rng = np.random.default_rng(20260907)
 
     # ---------------------------------------------------------------- grid
     t0 = time.time()
-    tree = Octree((a.npad, a.npad, a.nz), lmax=a.lmax, h_min=hmin,
+    tree = Octree((a.npad, a.npad, nzp), lmax=a.lmax, h_min=hmin,
                   periodic=(True, True, False))
-    pad = PixelAnode(tree, pitch=a.pitch, pad=(11 << (a.lmax - 4)) * hmin)
+    pad_mm = a.pad_width if a.pad_width is not None else PAD_FRACTION * a.pitch
+    pad = PixelAnode(tree, pitch=a.pitch, pad=pad_mm)
     tree.build(pad.refine_predicate(grade=8.0))
 
     R0 = build_rows(tree)
