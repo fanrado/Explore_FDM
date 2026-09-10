@@ -1,7 +1,7 @@
 {
-  "_": "The reference pixel-anode geometry: the configuration every number in",
-  "_1": "RESULTS.md was measured with. 5x5 periodic supercell, 4.434 mm pitch,",
-  "_2": "3.048 mm pad / 1.386 mm gap, 53.208 mm drift at 500 V/cm.",
+  "_": "The reference pixel-anode geometry: 5x5 periodic supercell, 4.434 mm",
+  "_1": "pitch, 3.048 mm pad / 1.386 mm gap, 297.078 mm drift (67 pitches) at",
+  "_2": "500 V/cm, h_min 138.6 um.",
   "_3": "Every Config field is given explicitly, so this file is the complete",
   "_4": "input to a run -- nothing is left to a code default. Keys beginning",
   "_5": "with _ are comments and are ignored on load.",
@@ -17,7 +17,7 @@
   "efield": 500.0,
   "_mesh": "coarsening away from the anode: cell size ~ distance_to_anode/grade",
   "grade": 8.0,
-  "_solver": "BiCGSTAB relative-residual target and iteration cap; float64 is the default, see RESULTS.md Test 5 for the float32 path",
+  "_solver": "BiCGSTAB relative-residual target and iteration cap. dtype float64 is the default; float32 plus iterative refinement is available and reaches the same accuracy, but is slower at these sizes (tests/test_precision.py)",
   "tol": 1e-11,
   "maxiter": 80000,
   "device": "cuda",
@@ -33,9 +33,9 @@
   "_response": "response table: paths per pixel, half-width in pixels, electron start height in mm, sub-pixel offset in pitch units, output units, RNG seed",
   "paths_per_pixel": 10,
   "npix": 2.4,
-  "start_z": 39.906,
+  "start_z": 222.80849999999998,
   "grid_offset": 0.5,
   "scale": "electron",
   "seed": 20260907,
-  "_derived": "h_min 138.6 um; pad 3.048375 mm = 22 h_min; gap 1.385625 mm = 10 h_min; drift 53.208 mm = 12 pitches; E 50.0 V/mm"
+  "_derived": "h_min 138.6 um; pad 3.048375 mm = 22 h_min; gap 1.385625 mm = 10 h_min; drift 297.078 mm = 67 pitches; E 50.0 V/mm"
 }

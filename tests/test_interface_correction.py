@@ -1,8 +1,8 @@
 """What the paper's transverse cancellation actually buys, vs the naive scheme.
 
-Previously reported in RESULTS.md as "Test 4" from an ad-hoc run against the
-superseded symmetric stencil, with no script in the repo.  This is that
-measurement, reproducible, against the paper's construction.
+This measurement previously existed only as an ad-hoc run against a superseded
+stencil, with no script in the repo.  This is it, reproducible, against the
+paper's construction.
 
 At fixed ``lmax`` the coarse/fine level jump is varied.  ``interface_correction
 = False`` forces the paper's weights to 1, which is the Losasso-style scheme

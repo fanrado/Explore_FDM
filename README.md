@@ -10,8 +10,9 @@ mask — no meshing, no cut cells. One composite operator covers every node at
 every refinement level, so a single sweep touches the whole grid; there is no
 level-by-level AMR cycling.
 
-See [PLAN.md](PLAN.md) for the method and the sizing argument behind it, and
-[RESULTS.md](RESULTS.md) for the verification suite.
+See [PLAN.md](PLAN.md) for the method and the sizing argument behind it. The
+scheme is that of Min, Gibou & Ceniceros, *J. Comput. Phys.* 218 (2006) 300–321,
+implemented as they construct it; `tests/test_paper*.py` verify that.
 
 ## Install
 
@@ -30,16 +31,15 @@ current and the response table, make the plots — is one command:
 python3 run_workflow.py --config configs/reference.json
 ```
 
-That is the configuration every number in [RESULTS.md](RESULTS.md) was measured
-with: a 5×5 periodic supercell of 4.434 mm pads, 3.048 mm pad / 1.386 mm gap,
-53.2 mm of drift at 500 V/cm, `h_min` = 138.6 µm. It writes the fields, the
-resampled grids, the induced current, the response table and the plots into
-`out/`, plus `out/README_outputs.txt` describing each file, and takes a couple of
-minutes on one GPU.
+That is the reference geometry: a 5×5 periodic supercell of 4.434 mm pads,
+3.048 mm pad / 1.386 mm gap, 297.078 mm of drift at 500 V/cm, `h_min` = 138.6 µm.
+It writes the fields, the resampled grids, the induced current, the response
+table and the plots into `out/`, plus `out/README_outputs.txt` describing each
+file.
 
 Start with `configs/quick.json` if you only want to check that the pipeline
-runs — it is the same geometry at a quarter of the resolution on a 3×3 cell,
-finishes in a few seconds, and is too coarse for physics:
+runs — same anode geometry, but a quarter of the resolution on a 3×3 cell with a
+17.736 mm drift. It finishes in a few seconds and is too coarse for physics:
 
 ```bash
 python3 run_workflow.py --config configs/quick.json
@@ -51,9 +51,9 @@ Geometry and run settings live in JSON, in `configs/`:
 
 | file | what it is |
 |---|---|
-| `reference.json` | the reference geometry; matches RESULTS.md |
+| `reference.json` | the reference geometry, 297.078 mm drift (67 pitches) |
 | `quick.json` | smallest config that exercises every stage, seconds to run |
-| `fine.json` | `h_min` = 34.6 µm on a 7×7 cell, ~10× the nodes |
+| `fine.json` | `h_min` = 34.6 µm on a 7×7 cell, 53.208 mm drift |
 | `coarse_pad.json` | a different pad/gap ratio at the same pitch |
 
 Every field of `fdm.workflow.Config` may appear in a config file, and every one

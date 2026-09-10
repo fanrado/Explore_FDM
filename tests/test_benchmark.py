@@ -1,10 +1,8 @@
 """Assembly and solve scaling on the production geometry.
 
-Previously reported in RESULTS.md as "Test 8" from an ad-hoc run against the
-superseded symmetric stencil, with no script in the repo.  This is that
-measurement, reproducible, against the paper's construction.  The numbers are
-not comparable to the old table: rows narrowed from 25 to 16 entries and the
-neighbour probe went from 24 locate calls per node to 8.
+This measurement previously existed only as an ad-hoc run against a superseded
+stencil, with no script in the repo.  This is it, reproducible, against the
+paper's construction.
 
 Single pixel cell, transverse periodic, 501 mm drift -- the same geometry as
 test_pad_decay, swept over h_min.  Set FDM_BENCH_LMAX to change the range.

@@ -15,7 +15,7 @@
   "efield": 500.0,
   "_mesh": "coarsening away from the anode: cell size ~ distance_to_anode/grade",
   "grade": 8.0,
-  "_solver": "BiCGSTAB relative-residual target and iteration cap; float64 is the default, see RESULTS.md Test 5 for the float32 path",
+  "_solver": "BiCGSTAB relative-residual target and iteration cap. dtype float64 is the default; float32 plus iterative refinement is available and reaches the same accuracy, but is slower at these sizes (tests/test_precision.py)",
   "tol": 1e-11,
   "maxiter": 80000,
   "device": "cuda",
