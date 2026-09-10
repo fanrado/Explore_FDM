@@ -4,6 +4,7 @@ from fdm.tree import Octree
 from fdm.topology import build_rows, build_gradient
 from fdm.operator import Operator
 from fdm.solve import solve
+from fdm.field import Gradient
 
 K = np.pi
 def phi(P):   # harmonic: laplacian == 0 exactly
@@ -28,14 +29,9 @@ def run(lmax, correction=True, dev="cuda"):
     b = A.rhs(ex)
     u, info = solve(A, b, tol=1e-12, maxiter=20000)
     err = (u - ex).abs()
-    G = build_gradient(t)
-    gi = torch.as_tensor(G.idx, device=dev); gv = torch.as_tensor(G.val, device=dev)
-    ge = grad(P)
-    gerr = 0.0
-    for a in range(3):
-        num = (gv[a]*u[gi[a]]).sum(1)
-        ref = torch.as_tensor(ge[G.row, a], device=dev)
-        gerr = max(gerr, float((num-ref).abs().max()))
+    G = Gradient(build_gradient(t), device=dev)
+    ge = torch.as_tensor(grad(P), device=dev)[G.row]
+    gerr = float((G(u) - ge).abs().max())
     # error restricted to nodes with a non-trivial (interpolated) stencil
     iface = torch.as_tensor(R.irr_row, device=dev, dtype=torch.long)
     return dict(h=t.h_min, n=R.nnode, cells=len(t), iters=info.iters, res=info.residual,
