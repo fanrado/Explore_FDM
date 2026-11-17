@@ -54,8 +54,9 @@ class Octree:
     # ------------------------------------------------------------------ basics
 
     def _invalidate(self):
-        """Drop cached per-level lookup tables (call after any topology change)."""
+        """Drop cached lookup tables and nodes (call after any topology change)."""
         self._lut = None
+        self._nodes = None
 
     def __len__(self) -> int:
         return self.cells.shape[0]
@@ -274,7 +275,19 @@ class Octree:
         lattice coordinates sorted by packed key, and ``corner_ids`` is
         (ncell, 8) giving the node id of each cell corner in the octant order
         ``(0,0,0), (0,0,1), (0,1,0), ... (1,1,1)``.
+
+        The result is cached until the tree changes (``_invalidate``), since
+        every stage asks for it and it costs a sort of all 8 * ncell corners.
+        The cached arrays are read-only; copy before modifying.
         """
+        if self._nodes is None:
+            coords, cid = self._compute_nodes()
+            coords.setflags(write=False)
+            cid.setflags(write=False)
+            self._nodes = (coords, cid)
+        return self._nodes
+
+    def _compute_nodes(self):
         s = self.sizes_units()[:, None]
         org = self.origins_units()
         offs = np.array(

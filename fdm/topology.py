@@ -379,8 +379,21 @@ def paper_weights(M: np.ndarray, interior: np.ndarray) -> np.ndarray:
     return w
 
 
+def node_stencil(tree: Octree, neumann=None) -> Stencil:
+    """:func:`stencil` for every node of ``tree``.
+
+    :func:`build_rows` and :func:`build_gradient` both start from this; pass
+    the result to both as ``st=`` to compute it once (it holds ~350 bytes per
+    node, so callers keep it only as long as they need it).
+    """
+    coords, _ = tree.nodes()
+    ny, nz = int(tree.key_dims[1]), int(tree.key_dims[2])
+    keys_sorted = (coords[:, 0] * ny + coords[:, 1]) * nz + coords[:, 2]
+    return stencil(tree, coords, keys_sorted, neumann=neumann)
+
+
 def build_rows(tree: Octree, interface_correction: bool = True,
-               neumann=None) -> Rows:
+               neumann=None, st: Stencil | None = None) -> Rows:
     """Assemble the composite Laplacian rows for every node of ``tree``.
 
     With ``interface_correction=False`` the paper's weights are forced to 1,
@@ -391,10 +404,8 @@ def build_rows(tree: Octree, interface_correction: bool = True,
     """
     coords, _ = tree.nodes()
     n = coords.shape[0]
-    ny, nz = int(tree.key_dims[1]), int(tree.key_dims[2])
-    keys_sorted = (coords[:, 0] * ny + coords[:, 1]) * nz + coords[:, 2]
-
-    st = stencil(tree, coords, keys_sorted, neumann=neumann)
+    if st is None:
+        st = node_stencil(tree, neumann=neumann)
 
     interior = st.have & st.out_ok.all(axis=0)
     boundary = ~interior
@@ -475,7 +486,7 @@ class GradRows:
     corr_val: np.ndarray     # (3, k, 10)
 
 
-def build_gradient(tree: Octree, neumann=None) -> GradRows:
+def build_gradient(tree: Octree, neumann=None, st: Stencil | None = None) -> GradRows:
     """Rows for d/dx, d/dy, d/dz at every interior node.
 
     Uses the same stencil as the Laplacian -- the same cell ``C``, the same
@@ -515,14 +526,14 @@ def build_gradient(tree: Octree, neumann=None) -> GradRows:
 
     This recomputes the octant probes rather than caching them on ``Rows``,
     which would cost ~600 bytes/node.  Gradients are needed once, at the end, so
-    recomputing is the cheaper trade.
+    recomputing is the cheaper trade -- unless the caller kept the stencil from
+    :func:`build_rows` (via :func:`node_stencil`) and passes it as ``st``; it
+    must have been built with the same ``neumann``.
     """
     coords, _ = tree.nodes()
     n = coords.shape[0]
-    ny, nz = int(tree.key_dims[1]), int(tree.key_dims[2])
-    keys_sorted = (coords[:, 0] * ny + coords[:, 1]) * nz + coords[:, 2]
-
-    st = stencil(tree, coords, keys_sorted, neumann=neumann)
+    if st is None:
+        st = node_stencil(tree, neumann=neumann)
     interior = st.have & st.out_ok.all(axis=0)
     sel = np.flatnonzero(interior)
     m = sel.size
