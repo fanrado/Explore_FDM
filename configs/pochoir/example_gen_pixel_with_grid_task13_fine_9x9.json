@@ -1,0 +1,20 @@
+{
+    "_description": "Task13 WEIGHTING field, FINE, 9x9 VARIANT for Explore_FDM: a copy of example_gen_pixel_with_grid_task13_fine.json (pochoir/scripts, commit 9d9cd36) with only Npixels changed 5 -> 9, i.e. a 39.6 mm = 396-cell transverse weighting domain at the 4.4 mm pitch. Every other key is identical; see the 5x5 file for what each one means.",
+    "HoleRadius": 1.9,
+    "PcbWidth": 1.6,
+    "GridHoleShape": "None",
+    "pixelPlaneLowEdgePosition": 9.9,
+    "pixelPlaneWidth": 0.1,
+    "padThickness": 0.05,
+    "padThicknessCells": 3,
+    "FR4Thickness": 0.1,
+    "pixelSize": 3.5,
+    "pixelGap": 0.9,
+    "chamfer_r": 0.7,
+    "chamferMode": "dynamic",
+    "Npixels": 9,
+    "enableInsulatorFR4": true,
+    "_driftZDepth_description": "PHASE 2 RETARGET: driftZDepth is 160.6, the cathode plane literally, not the 160.1 launch node (the launch node lives in launchZ on the drift side). This is a FIX, not bookkeeping. gen_pcb_pixel_with_grid.py:312 places the weighting cathode at z_cat = int(round(driftZDepth / spacing)); at the 0.55mm coarse spacing 160.1 gave round(291.09) = 291, while the same block ALSO grounds barr[:,:,-1] = plane 292 -- two grounded planes with a dead cell between them, and a weighting z_cat that did NOT coincide with the drift cathode at 292, defeating that code's own stated intent (quoted in its comment) to share the same physical cathode plane with the drift generator. Confirmed in scripts/store_hybrid_16cmdrift/boundary/w_coarse.npz: held planes were [0, 17, 18, 19, 291, 292]. At 160.6, round(160.6/0.55) = 292, which IS barr[:,:,-1]: one grounded cathode plane, coinciding with the drift cathode. Only w_coarse is affected -- the near weighting domain is 298 planes deep, so z_cat (1601 fine) exceeds shape[2] and the guard at gen_pcb_pixel_with_grid.py:313 skips it, as intended for near-field tiles whose far face is pinned by near-bc; the full-depth fine weighting lattice is never solved, hybrid_iterate._stitch upsamples the coarse solution onto it. These configs carry no CathodePotential (weighting is a unit-probe solve), so there is nothing to re-derive here.",
+    "driftZDepth": 160.6,
+    "nGridPoints": 10
+}

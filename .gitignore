@@ -25,3 +25,6 @@ out_*/
 *.swp
 .DS_Store
 *~
+
+# generated slide decks (docs/make_methods_slides.py writes them)
+*.pptx

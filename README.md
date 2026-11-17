@@ -135,6 +135,66 @@ Each run writes `<outdir>/stages.jsonl` with per-stage wall time and memory;
 `profile_runtime.py` turns that into a report, and `monitor_gpu.py` samples GPU
 usage while a run is in flight.
 
+## Running from a pochoir config
+
+`run_pochoir.py` takes pochoir's own pixel JSON (e.g.
+`example_gen_pcb_drift_pixel_task13_fine.json` and its weighting sibling) and
+solves the same problem pochoir solves, so the two can be compared index by
+index:
+
+```bash
+python3 run_pochoir.py --config configs/pochoir_task13_fine.json
+python3 compare_pochoir.py --ours out_pochoir \
+        --store ../pochoir/scripts/store_singlespacing_16cmdrift_16092026
+```
+
+`configs/pochoir_task13_fine.json` points at copies of the two pochoir configs
+in `configs/pochoir/`; `--drift-config` / `--weighting-config` take any others.
+`spacing` is the pochoir grid spacing the configs were written for (pochoir's
+`--spacing`; 0.1 for `*_fine`, 0.55 for `*_coarse`). Set `refine` to solve on
+`h_min = spacing / 2**refine`.
+
+What is reproduced (details in `fdm/pochoir.py`):
+
+- pochoir's integer arithmetic: every `int()`/`round()` its generators apply to
+  pad size, gap, chamfer, pad-plane position and FR4/pad thickness. The pads
+  are pochoir's node sets including the rounded corners. `tests/test_pochoir.py`
+  checks that they are identical to the arrays pochoir's generators draw, at
+  0.1 and 0.55 mm.
+- The anode is the drift-facing pad plane (10.0 mm for task13 fine): pads are
+  Dirichlet and gaps get a node-centred no-flux mirror, as pochoir's
+  `enableInsulatorFR4` path does.
+- Drift field: a periodic single-pitch tile with the cathode at
+  `CathodePotential` on the last plane.
+- Weighting field: an `Npixels`² probe whose walls are held at 0 on pochoir's
+  halo nodes. Those sit one cell outside the array, not on its first and last
+  nodes.
+- Electrons: pochoir's start grid at `launchZ`, BNL mobility at 87 K, positions
+  sampled on its 0.05 µs ticks, and `induce-pixel`'s impact grid (25×25 for `Npixels` 5)
+  and waveform layout.
+
+Boundaries that do not fall on a root-cell face are embedded: the walls are
+22.1 mm apart and the cathode is 150.6 mm from the anode, neither of which is a
+whole number of root cells. Cells straddling such a plane are refined until the
+plane is a cell face, and every node on or beyond it is held.
+
+Not supported, and these raise rather than approximate: shield grids
+(`GridHoleShape` other than `None`), the `fixed_cell` chamfer, `enableFR4`, and
+configs without `enableInsulatorFR4`.
+
+Outputs in `out_pochoir/`, all in pochoir's coordinates (mm):
+
+| file | matches pochoir |
+|---|---|
+| `drift_lattice.npz` | `potential/drift3d` (N, N, Nz), from the anode plane up |
+| `weighting_lattice.npz` | `potential/weight3d`, the first `export_weighting_zmax` mm |
+| `paths.npz` | `paths/drift3d` (100, 4000, 3) |
+| `current.npz` (`current_pochoir`) | `current/induced_current` (625, 3999) |
+| `drift_field.npz`, `weighting_field.npz` | native octree fields (`fdm.io.load_field`) |
+
+For firep or any other code, the lattice files are plain regular grids with
+their z offset (`k0`) and spacing stored alongside.
+
 ## Package layout
 
 | module | contents |
@@ -149,6 +209,8 @@ usage while a run is in flight.
 | `fdm/drift.py` | drift velocity, RK4 tracking, Shockley-Ramo current |
 | `fdm/io.py` | `.npz` I/O, native-octree and resampled-grid forms |
 | `fdm/workflow.py` | the stages, the config and the stage log |
+| `fdm/pochoir.py` | pochoir JSON -> exact integer geometry, start grid, BNL mobility |
+| `fdm/pochoir_workflow.py` | stages for a pochoir config, outputs in pochoir's layout |
 
 ## Standalone scripts
 
@@ -157,6 +219,9 @@ usage while a run is in flight.
 - `make_response.py` — induced-current response table on an impact grid
   (pochoir-compatible layout)
 - `plot_induced_current.py` — example figure from `out/induced_current.npz`
+- `run_pochoir.py` — the pipeline driven by a pochoir config (see above)
+- `compare_pochoir.py` — report and figure comparing a run with a pochoir store
+- `docs/make_methods_slides.py` — builds `docs/Explore_FDM_methods.pptx`
 - `monitor_gpu.py` — sample GPU memory/utilisation during a run
 - `profile_runtime.py` — turn `stages.jsonl` into a runtime and memory report
 
@@ -169,6 +234,7 @@ on failure, and run on the CPU if no GPU is present:
 PYTHONPATH=. python3 tests/test_paper.py              # exact identities, structure
 PYTHONPATH=. python3 tests/test_paper_convergence.py  # paper Section 9.1.6
 PYTHONPATH=. python3 tests/test_paper_neumann.py      # paper Sections 7 and 9.1.7
+PYTHONPATH=. python3 tests/test_pochoir.py            # pochoir geometry, node for node
 ```
 
 The sharpest of these is an exact identity rather than a convergence study: the

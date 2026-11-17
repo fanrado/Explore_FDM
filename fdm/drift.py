@@ -90,29 +90,36 @@ def fill_missing(tree: Octree, values, have, passes=6):
     v = np.array(values, dtype=np.float64, copy=True)
     have = np.array(have, dtype=bool, copy=True)
     v[~have] = 0.0
+    n = v.shape[0]
+    cols = v.reshape(n, -1)
     for _ in range(passes):
         if have.all():
             break
-        acc = np.zeros_like(v)
-        cnt = np.zeros(v.shape[0])
+        # Every ordered corner pair (m, s) of every cell: node cid[:, m]
+        # receives node cid[:, s] if s is covered.  np.bincount instead of
+        # np.add.at, which is two orders of magnitude slower at millions of
+        # cells.
         src = have[cid]                       # (ncell, 8)
+        ksum = src.sum(1)
+        G = cols[cid] * src[:, :, None]       # covered corner values
+        Gsum = G.sum(1)                       # (ncell, C)
+        cnt = np.zeros(n)
+        acc = np.zeros_like(cols)
         for m in range(8):
             tgt = cid[:, m]
-            for s in range(8):
-                if s == m:
-                    continue
-                ok = src[:, s]
-                np.add.at(cnt, tgt[ok], 1.0)
-                np.add.at(acc, tgt[ok], v[cid[ok, s]])
+            cnt += np.bincount(tgt, weights=ksum - src[:, m], minlength=n)
+            for c in range(cols.shape[1]):
+                acc[:, c] += np.bincount(tgt, weights=Gsum[:, c] - G[:, m, c],
+                                         minlength=n)
         fill = (~have) & (cnt > 0)
-        v[fill] = acc[fill] / cnt[fill][:, None] if v.ndim == 2 else acc[fill] / cnt[fill]
+        cols[fill] = acc[fill] / cnt[fill][:, None]
         have |= fill
-    return v
+    return cols.reshape(v.shape)
 
 
 def drift_paths(tree, Efield, starts_mm, z_stop=0.0, dt_frac=0.25,
                 max_steps=200000, temperature=87.3, max_time=None,
-                return_status=False):
+                return_status=False, speed=None):
     """RK4-track electrons from ``starts_mm`` down to ``z_stop``.
 
     The step is limited to ``dt_frac`` of the local cell crossing time, so the
@@ -127,19 +134,27 @@ def drift_paths(tree, Efield, starts_mm, z_stop=0.0, dt_frac=0.25,
     BC (real gaps are resolved by diffusion), but they must be detected rather
     than run to ``max_steps``.
 
+    ``speed``, if given, replaces the default ICARUS parameterization: a
+    callable taking |E| in V/mm and returning the drift speed in mm/us (e.g.
+    :func:`fdm.pochoir.bnl_drift_velocity`, pochoir's mobility).
+
     Returns a list of (npt, 4) arrays holding ``[x, y, z, t]`` (mm, us), and
     with ``return_status`` also a bool array flagging which paths arrived.
     """
     interp = Interpolator(tree)
     hmin = tree.h_min
+    speed_fn = speed      # the loop below reuses the name ``speed``
 
     def vel(p):
         """Electron velocity (mm/us): speed from |E|, direction along -E."""
         E = interp(Efield, p)                       # V/mm
         mag = np.linalg.norm(E, axis=1)
-        speed = drift_velocity(mag * 10.0 / 1000.0, temperature)   # V/mm -> kV/cm
+        if speed_fn is None:
+            v = drift_velocity(mag * 10.0 / 1000.0, temperature)   # V/mm -> kV/cm
+        else:
+            v = speed_fn(mag)
         d = -E / np.maximum(mag, 1e-30)[:, None]
-        return d * speed[:, None], mag
+        return d * v[:, None], mag
 
     p = np.array(starts_mm, dtype=np.float64)
     n = len(p)

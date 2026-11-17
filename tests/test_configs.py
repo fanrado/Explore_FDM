@@ -15,6 +15,10 @@ Checks, per file:
      multiples of ``h_min`` and the drift is a whole number of pitches;
   5. the ``_derived`` comment matches what the values actually resolve to, so
      the prose cannot go stale.
+
+Files with a ``drift_config`` key are run_pochoir.py inputs: they are checked
+against ``PochoirConfig`` instead (checks 1 and 2, the only nulls being the
+documented optional ones, and the pochoir JSON they name must translate).
 """
 import dataclasses
 import glob
@@ -22,10 +26,15 @@ import json
 import os
 import sys
 
+from fdm.pochoir_workflow import PochoirConfig
 from fdm.workflow import Config
 
 FIELDS = {f.name for f in dataclasses.fields(Config)}
 RUNTIME_NULL = {"pad_before"}      # genuinely not knowable from the config
+P_FIELDS = {f.name for f in dataclasses.fields(PochoirConfig)}
+# null means "derive from the pochoir config" or "no limit"
+P_NULL = {"weighting_config", "cathode_idx", "export_drift_zmax",
+          "export_weighting_zmax"}
 
 FAIL = []
 
@@ -45,6 +54,24 @@ for path in paths:
     with open(path) as f:
         raw = json.load(f)
     values = {k: v for k, v in raw.items() if not k.startswith("_")}
+
+    if "drift_config" in values:
+        unknown = sorted(set(values) - P_FIELDS)
+        check(not unknown, f"[pochoir] no unknown keys"
+              f"{'' if not unknown else f': {unknown}'}")
+        missing = sorted(P_FIELDS - set(values))
+        check(not missing, f"[pochoir] all {len(P_FIELDS)} PochoirConfig fields "
+              f"present{'' if not missing else f'; missing {missing}'}")
+        if unknown or missing:
+            continue
+        nulls = sorted(k for k, v in values.items() if v is None)
+        check(set(nulls) <= P_NULL, f"[pochoir] nulls only where documented "
+              f"({nulls or 'none'})")
+        geom = PochoirConfig(**values).geometry()
+        check(geom.anode_idx < geom.cathode_idx,
+              f"[pochoir] translates: anode {geom.z_anode:.3f} mm, cathode "
+              f"{geom.z_cathode:.3f} mm, {geom.npixels}x{geom.npixels} probe")
+        continue
 
     unknown = sorted(set(values) - FIELDS)
     check(not unknown, f"no unknown keys{'' if not unknown else f': {unknown}'}")
